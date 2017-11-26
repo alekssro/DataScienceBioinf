@@ -1,0 +1,295 @@
+---
+title: "Data science - Midterm assignment"
+author: "Judit Kisistok"
+date: "10/9/2017"
+output: pdf_document
+---
+```{r message=FALSE}
+library(tidyverse)
+```
+
+Importing the data
+```{r message = FALSE}
+data = read_delim(file="dgrp2.tgeno.zip",delim=c(" "))
+```
+
+### Q0. Describe briefly the structure of the data and what the different variables mean. How many chromosomes do you have?
+```{r}
+names(data)
+dim(data)
+```
+The table has 4438427 observations and 214 variables.
+The variables are the following:
+- chr: chromosome (X, 2L, 2R, 3L, 3R)
+- pos: position in the chromosome
+- id: identification of the SNP
+- ref: reference allele (in wild type)
+- alt: alternative allele
+- refc: reference allele count 
+- altc: alternative allele count
+- qual: number denoting the quality of sequencing
+- cov: sequence coverage
+- line_X (where X is a number between 21 and 913): Drosophila melanogaster Genetic Reference Panel (DGRP) lines - fully sequenced inbred lines derived from a natural population, data denotes whether the particular line has the ref allele (0), the alternative allele (2) or the data is missing (-) for a given SNP
+
+We have chromosome X, chromosome 2 (left and right arm) and chromosome 3 (left and right arm).
+
+### Q1. Extract the first 100,000 SNPs located on chromosome 3L.
+```{r}
+chrom3_L = filter(data, chr == "3L")
+chrom3_L = chrom3_L[1:100000,]
+
+nrow(chrom3_L)
+```
+#### Locate the genomic position of the first and last SNP
+```{r}
+first = chrom3_L[1,]$pos
+first
+last = chrom3_L[100000,]$pos
+last
+```
+The first SNP is at position 19766 and the last SNP is at position 2291523.
+
+#### Filter out all SNPs for which less than 75%, 80%, 90%, 95% of the individuals could be genotyped, report how many SNPs are left based on the filter you apply
+```{r}
+nr_of_lines = 205
+
+chrom3_L = chrom3_L %>% 
+    mutate(genotyped = refc + altc,
+    genotyped_percentage = (genotyped / nr_of_lines)*100,
+    ref_freq = (refc / genotyped),
+    alt_freq = (altc / genotyped),
+    bin_5k = pos%/%5000) 
+
+morethan75 = filter(chrom3_L, genotyped_percentage >= 75)
+morethan80 = filter(chrom3_L, genotyped_percentage >= 80)
+morethan90 = filter(chrom3_L, genotyped_percentage >= 90)
+morethan95 = filter(chrom3_L, genotyped_percentage >= 95)
+
+nrow(morethan75)
+nrow(morethan80)
+nrow(morethan90)
+nrow(morethan95)
+```
+I have 98112, 97531, 94944 and 89473 SNPs after keeping only the SNPs for which more than 75%, 80%, 90% and 95% of the individuals are genotyped.
+
+#### In all subsequent questions, restrict your attention to SNP genotyped in at least 95% of individuals.
+
+### Q2. Graph the distribution of SNP allele frequencies, graph the distribution of coverage of SNPs ("cov") and the distribution of number of lines genotyped for each snp.
+```{r}
+# distribution of SNP allele frequencies
+ggplot(morethan95) +
+  geom_histogram(mapping = aes(x = alt_freq), binwidth = 0.01, col = "black", fill = "deeppink4") +
+  labs(title = "Distribution of SNP allele frequencies") +
+  xlab("Alternative allele frequency")
+```
+We can see that the alternative allele frequency is close to 0 (or 0) in the majority of SNPs.
+
+```{r}
+# distribution of coverage 
+ggplot(morethan95) +
+  geom_histogram(mapping = aes(x = cov), binwidth = 1, col = "black", fill = "deeppink4") +
+  labs(title = "Distribution of coverage") +
+  xlab("Coverage")
+```
+The coverage appears to be normal or Poisson distributed.
+
+```{r}
+# distribution of number of lines genotyped for each SNP
+ggplot(morethan95) +
+  geom_histogram(mapping = aes(x = genotyped), binwidth = 1, col = "black", fill = "deeppink4") +
+  labs(title = "Distribution of number of lines genotyped") +
+  xlab("Number of lines genotyped")
+```
+We only kept the SNPs where at least 95% of the individuals were genotyped, and we can see from the plot that a lot of lines were fully genotyped.
+
+```{r}
+# for all the SNPs on chromosome 3L
+ggplot(chrom3_L) +
+  geom_histogram(mapping = aes(x = genotyped), binwidth = 3, col = "black", fill = "deeppink4") +
+  labs(title = "Distribution of number of lines genotyped") +
+  xlab("Number of lines genotyped")
+```
+This plot shows the number of lines genotyped for the unfiltered data - we can see that the majority of the lines are well-genotyped.
+
+#### Is there a statistical association the different types of SNPs and the allele frequency of SNPs? The type of snp is defined in the last part of the "id" column.
+
+I filtered the data such that only the point mutations remain (filtering out the insertions / deletions).
+```{r}
+morethan95_point <- filter(morethan95, alt %in% c("A", "T", "C", "G") & ref %in% c("A", "T", "C", "G"))
+nrow(morethan95_point)
+```
+
+I focused on the transitions vs transversions and ran the analysis to examine whether there is an association between the different mutation types and the alternative allele frequencies.
+
+I created allele frequency categories such that category 0 has the SNPs with alternative allele frequencies below 10%, category 1 has SNPs with alternative allele frequencies between 10-20% and so on. Then I separated the transitions and transversions, annotated them, then merged them into the same all_mut dataframe.
+
+```{r}
+morethan95_point <- morethan95_point %>%
+  mutate(allelefreqcat = (alt_freq%/%0.1))
+
+transitions <- filter(morethan95_point, ref %in% c("A", "G") & alt %in% c("A", "G") | ref %in% c("C", "T") & alt %in% c("T", "C"))
+transversions <- filter(morethan95_point, ref %in% c("A", "C") & alt %in% c("C", "A") | ref %in% c("G", "T") & alt %in% c("T", "G") | ref %in% c("A", "T") & alt %in% c("T", "A") | ref %in% c("G", "C") & alt %in% c("C", "G"))
+
+transitions <- transitions %>%
+  transmute(ref, alt, alt_freq, allelefreqcat, type = "Transition")
+transversions <- transversions %>%
+  transmute(ref, alt, alt_freq, allelefreqcat, type = "Transversion")
+
+all_mut <- rbind(transitions, transversions)
+
+ggplot(all_mut) +
+  geom_histogram(mapping = aes(alt_freq, fill = type), col = "black", binwidth = 0.02) +
+  labs(title = "Histogram of the alternative allele frequencies") +
+  xlab("Alternative allele frequency") +
+  ylab("Counts")
+
+```
+
+The plot supports the biological knowledge that transitions are more common than transversions. The alternative allele frequencies follow a similar distribution in both cases.
+
+```{r}
+all_mut$allelefreqcat <- factor(all_mut$allelefreqcat, levels = c(0:10))
+mut_table <- table(all_mut$type, all_mut$allelefreqcat)
+addmargins(mut_table)
+
+mosaicplot(t(mut_table), col = c("deeppink4", "lightslategray"), cex.axis = 1, sub = "Allele frequency category", ylab = "Mutation type")
+
+chitest = chisq.test(mut_table, correct = F)
+chitest
+```
+The chi square test shows that there is indeed a statistical association between the type of mutation and the alternative allele frequencies. By examining the contingency table, we can see that in each category there are significantly less transversions.
+
+### Q3. If coverage was homogenous throughout the genome (by that we mean that on average the coverage is the same for any given posititon), what probability distribution is expected to capture well the coverage ?
+
+Poisson distribution with a mean of 32.09934.
+```{r}
+overall_cov = mean(morethan95$cov)
+```
+
+
+I calculated the mean coverage for each bin and plotted it (the horizontal line shows the mean).
+```{r}
+morethan95_bin <- morethan95 %>%
+    group_by(bin_5k) %>%
+  mutate(
+    mean_cov = mean(cov),
+    var_coverage = var(cov), 
+    var_mean = mean(var_coverage, na.rm = TRUE)) %>%
+  ungroup()
+
+ggplot(morethan95_bin) +
+  geom_point(mapping = aes(x = bin_5k, y = mean_cov), color = "deeppink4") +
+  labs(title = "Coverage throughout the genome") +
+  geom_hline(yintercept = overall_cov) +
+  xlab("Bins") +
+  ylab("Coverage") 
+```
+We can see that the majority of the bins have mean coverage between 27 and 37, however, there seems to be a dip around the 210th bin.
+
+### Q4. Make goodness of fit test of the coverage data: is the theoretical distribution proposed in Q3 a good fit for the data?
+
+I created bins of size 25k and used the chi square test to examine the goodness of fit. I also plotted the mean/variance ratio and added the observed mean-variance ratio (in yellow) as well as the theoretical mean-variance ratio (= 1, since we are looking at the Poisson distribution, in light blue) to the plot.
+
+```{r}
+g_o_f = morethan95 %>% 
+    mutate(bin_25k = pos%/%25000) %>%
+  group_by(bin_25k) %>%
+  mutate(
+           mean_cov = mean(cov),
+           cov_var = var(cov),
+           var_mean = mean(cov_var)) %>%
+  ungroup()
+
+test <- g_o_f %>%
+  transmute(bin_25k, mean_cov, var_mean)
+test <- unique(test)
+
+exp_cov <- rpois(1:nrow(test), overall_cov)
+
+data_var_mean = mean(test$mean_cov, na.rm = TRUE)/mean(test$var_mean, na.rm = TRUE)
+
+ggplot() +
+  geom_histogram(mapping = aes(test$mean_cov/test$var_mean), fill = "deeppink4", col = "black", binwidth = 0.04) +
+  geom_vline(xintercept = 1, color = "lightblue") +
+  geom_vline(xintercept = data_var_mean, color = "yellow") +
+  labs(title = "Histogram of the observed mean-variance ratio in the bins of size 25k") +
+  xlab("Mean / variance")
+
+a <- chisq.test(test$mean_cov, p = exp_cov, rescale.p = TRUE)
+a
+
+```
+This p-value means that we can't reject the null hypothesis that the data fits the Poisson-distribution.
+
+### Q5. Pick yourself a small (100 kb) region on chromosome 3L
+```{r}
+# position 200000 - 300000
+small_data = filter(morethan95_point, between(pos, 200000, 300000))
+nrow(small_data)
+```
+
+#### Graph the frequency of "0" alleles along that region
+```{r}
+ggplot(small_data) +
+  geom_histogram(mapping = aes(x = ref_freq), binwidth = 0.01, fill = "deeppink4", col = "black") +
+  labs(title = "Frequency of 0 alleles between positions 200k and 300k")
+
+ggplot(small_data) +
+  geom_point(mapping = aes(x = pos, y = ref_freq, color = genotyped)) +
+  xlab("Genomic position from position 200k to position 300k") +
+  ylab("Frequency of reference allele (Allele 0)")
+
+```
+The majority of SNPs in this region have the reference allele frequency close to 1, however, there appears to be a dip around position 300.000 (and position 28.000, to a lesser extent).
+
+#### Calculate the statistical association between allelic states of each pair of neighboring SNPS (this association is also called LD)
+
+I only kept the SNPs that are fully genotyped, then I created new columns for the expected frequencies and the distances between the ith and i-1st SNP.
+
+```{r}
+small_full = filter(small_data, genotyped_percentage == 100)
+
+small_full <- small_full %>%
+  mutate(dist = pos - lag(pos),
+         exp_22 = alt_freq*lag(alt_freq),
+         exp_20 = alt_freq*lag(ref_freq),
+         exp_02 = ref_freq*lag(alt_freq),
+         exp_00 = ref_freq*lag(ref_freq))
+```
+ 
+Then I calculated the observed frequencies for all combinations.
+```{r}
+type_22 = NULL
+type_20 = NULL
+type_02 = NULL
+type_00 = NULL
+
+# observed frequencies
+for (i in 2:(nrow(small_full))) {
+  type_22 = c(type_22, sum(small_full[i, 16:220] == 2 & small_full[i - 1, 16:220] == 2)) 
+  type_02 = c(type_02, sum(small_full[i, 16:220] == 0 & small_full[i - 1, 16:220] == 2))
+  type_20 = c(type_20, sum(small_full[i, 16:220] == 2 & small_full[i - 1, 16:220] == 0))
+  type_00 = c(type_00, sum(small_full[i, 16:220] == 0 & small_full[i - 1 , 16:220] == 0))
+}
+sf <- small_full[2:nrow(small_full),]
+
+LD <- data.frame(sf$dist, sf$exp_22, sf$exp_20, sf$exp_02,sf$exp_00, type_22/nr_of_lines, type_20/nr_of_lines,type_02/nr_of_lines, type_00/nr_of_lines)
+
+colnames(LD) <- c("dist", "exp_22", "exp_20","exp_02","exp_00", "obs_22","obs_20","obs_02", "obs_00")
+
+```
+
+
+#### Explore visually how LD varies with the physical distance beween SNPs (measured in bp)
+Compare and discuss with the Fig 1 of the paper.
+```{r}
+LD <- LD %>%
+  mutate(LD = obs_22-exp_22)
+
+ggplot(LD) +
+  geom_point(mapping=aes(x=dist, y=LD, col = dist)) +
+  xlab("Distance between neighboring SNPs") +
+  labs(title = "Decay of linkage disequilibrium with physical distance between neighboring SNPs")
+```
+
+We can see the same tendencies as in the paper, such that LD is present in certain pairs of SNPs that are close to eachother and it decays with distance, however, my figure doesn't show such a well-defined pattern as the figure in the paper - one possible reason for this can be that I've only taken the neighboring SNPs into account, not all possible combinations.

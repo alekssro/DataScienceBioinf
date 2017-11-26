@@ -1,0 +1,265 @@
+---
+title: "Mid Term Project DSBioinformatics"
+author: "Alejandro Roca"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Q0. Import the data (warning the file is big, consider using skip and nmax when reading in data)
+
+```{r import_data, echo=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+data <- read_delim(file="dgrp2.tgeno", delim=c(" "), na = c("-"))
+d <- data %>% filter(ref %in% c("A", "C", "T", "G")) %>%
+    filter(alt %in% c("A", "C", "T", "G")) #filter things different to SNPs
+
+#rm(data)
+```
+
+Describe briefly the structure of the data and what the different variables mean
+
+```{r data_structure}
+head(d)
+```
+
+As we can see, the data set is structured in a way that there is 1 SNP in each row. For each SNP we have different values (columns):
+
+- `chr`: Is the chromosome where the SNP is located
+- `pos`: the physical position where the SNP is located in the chromosome (which bp)
+- `id`: an identification code for the SNP
+- `ref`: the nucleotide present in the reference genome for that SNP
+- `alt`: the alternative nucleotide for that SNP
+- `refc`: the coverage for the reference SNP (how many lines have the reference nucleotide)
+- `altc`: the coverage for the alternative SNP (how many lines have the alternative nucleotide)
+- `qual`: quality
+- `cov`: coverage for the SNP
+- `line_*`: 205 lines representing the reads results for the SNP
+
+#### How many different chromosomes do you have?
+
+```{r chr}
+levels(factor(d$chr))
+```
+
+We have 6 different values for the feature "chr" which indicates the chromosome. The output indicates there are SNPs in the left and right arms of chromosome 2, left and right arms of chromosome 3, chromosome 4 and chromosome X. Therefore, we have 4 different chromosomes.
+
+## Q1. Extract the first 100,000 SNPs located on chromosome 3L,
+
+```{r filter_first_SNP}
+d <- d %>%
+    filter(chr == "3L") %>%
+    arrange(pos)
+
+d <- d[1:100000, ]
+```
+
+- Locate the genomic position of the first and last SNP
+
+```{r min_max}
+min(d$pos)     #genomic position for the first SNP
+max(d$pos)     #genomic position for the last SNP
+```
+
+- filter out all SNPs for which less than 75%, 80%, 90%, 95%  of the individuals could be genotyped, report how many SNPs are left based on the filter you apply
+
+```{r f_genotyped}
+n.lines <- dim(d)[2] - 9     #number of individuals
+d <- d %>%
+    mutate(n_genotyped = refc + altc, f_genotyped = n_genotyped / n.lines)
+
+d %>%
+    summarise(n_95 = {filter(d, f_genotyped > .95) %>% nrow()}, 
+              n_90 = {filter(d, f_genotyped > .90) %>% nrow()},
+              n_80 = {filter(d, f_genotyped > .80) %>% nrow()},
+              n_75 = {filter(d, f_genotyped > .75) %>% nrow()})
+
+
+```
+
+
+In all subsequent questions, restrict your attention to SNP genotyped in at least 95% of individuals
+
+```{r f_genotyped_0.95}
+d <- d %>% filter(f_genotyped > .95)
+```
+
+
+## Q2. Graph the distribution of SNP allele frequencies, graph the distribution of coverage of SNPs ("cov") and the distribution of number of lines genotyped for each snp
+
+```{r graph_freq+cov+n_genotyped}
+d <- d %>% mutate(maf = apply(d[,c("refc", "altc")], 1, min) / n_genotyped) #get minor allele frequency
+
+#graph the distribution of SNP mafs
+d %>% ggplot() +
+    geom_histogram(mapping = aes(x = maf, fill = T), binwidth = 0.01, color = "brown") +
+    guides(fill = "none") +
+    labs(title = "Distribution of SNP allele frequencies", x = "Minor allele frequency", y = "Count")
+
+#graph the distribution of coverage of SNPs
+d %>% ggplot() +    
+    geom_histogram(mapping = aes(x = cov, fill = T), binwidth = 1, color = "brown") +
+    guides(fill = "none") +
+    labs(title = "Distribution of coverage of SNPs", x = "Coverage of SNP", y = "Count")
+
+#graph the distribution of number of lines genotyped for each SNP
+d %>% ggplot() +    
+    geom_histogram(mapping = aes(x = n_genotyped, fill = T), binwidth = 1, color = "brown") +
+    guides(fill = "none") +
+    labs(title = "Distribution of number of lines genotyped for each SNP", x = "Nº of lines genotyped", y = "Count")
+```
+
+Looking at the different plots we can say:
+
+1. there is a big number of alleles with a minor allele frequency close to 0 (rare alleles) and then there is a dicreasing number of higher frequencies.
+2. the coverage seems to follow a normal or poisson distribution
+3. the number of lines genotyped for each SNP increases towards 205 (total number of lines)
+
+ - Is there a statistical association the different types of SNPs and the allele frequency of SNPs?
+ 
+ To see this we will divide the SNPs in 2 categories: transversions and transitions. We then split the SNPs in deciles by their alternative allele frequency. To see if they follow the same distribution we will see if they fit well to a linear model.
+ 
+```{r association_types}
+transversions <- d %>% filter(ref == "A" & alt == "T" | ref == "A" & alt == "C" | 
+                                  ref == "C" & alt == "A" | ref == "C" & alt == "G" | 
+                                  ref == "G" & alt == "T" | ref == "G" & alt == "C" |
+                                  ref == "T" & alt == "G" | ref == "T" & alt == "A") %>%
+    mutate(altf = altc / (altc + refc))
+
+transitions <- d %>% filter(ref == "A" & alt == "G" | ref == "G" & alt == "A" |
+                                ref == "C" & alt == "T" | ref == "T" & alt == "A") %>%
+    mutate(altf = altc / (altc + refc))
+
+#Divide the transition and transversion alternative frecuencies by deciles
+tmp <- split(transversions$altf, cut(transversions$altf, seq(0, 1, by = 0.1), include.lowest=TRUE))
+transversions.ranged <- sapply(tmp, length)
+
+tmp <- split(transitions$altf, cut(transitions$altf, seq(0, 1, by = 0.1), include.lowest=TRUE))
+transitions.ranged <- sapply(tmp, length)
+
+table <- data.frame(transversions.ranged, transitions.ranged)
+Deciles <- rownames(table)
+print(t(table))
+
+#fit to linear model
+model = lm(transversions.ranged ~ transitions.ranged, table)    
+summary(model)
+
+#qplot transversions vs transitions
+table %>% ggplot(mapping = aes(x = transversions.ranged, y = transitions.ranged)) +
+    geom_point(mapping = aes(color = Deciles)) +
+    geom_smooth(method = lm) +
+    annotate("text", y= 25000, x = 10000, label = paste("R^2:", summary(model)$r.squared), parse = T, color = "blue") +
+    labs(title = "Frequencies of transversion vs transition SNPs by deciles", 
+     x = "Transversion SNPs", y = "Transition SNPs")
+```
+
+As we can see, the data fits really well a linear model, so we can say they are statistically associated.
+
+## Q3. If coverage was homogenous throughout the genome (by that we mean that on average the coverage is the same for any given posiiton),
+ - what probability distribution is expected to capture well the coverage ?
+ 
+ We would expect the distribution to be a poisson distribution with $\lambda = mean(coverage)$ similar to the following:
+ 
+```{r cov_expected_distrib}
+pois.distrib <- data.frame(expected = rpois(n = nrow(d), lambda = mean(d$cov)))
+pois.distrib %>% ggplot(aes(x = expected)) +
+    geom_histogram(binwidth = 1) +
+    theme_minimal()
+```
+
+## Q4. Make goodness of fit test of the coverage data: is the theoretical distribution proposed in Q3 a good fit for the data?
+
+To make a goodness of fit test we can compare the coverage values of the data with the values we would obtain in a poisson distribution of $\lambda =  mean(cov)$
+
+```{r goodness_fit}
+pvals <- replicate(1000, {
+    chisq.test(data.frame(x = rpois(nrow(d), lambda = mean(d$cov)), y = d$cov))$p.value
+})
+
+mean(pvals)
+```
+
+The mean p value for 1000 $\chi^2$ tests is approx. 1, which indicates that there is a good fit between the data distibution and the poisson distribution. We can conclude that the coverage follows a poisson distribution.
+
+## Q5. Pick yourself a small (100 kb) region on chromosome 3L
+
+```{r small_region}
+d <- d %>% filter(pos > 1405000 & pos < 1505000)
+```
+
+ - Graph the frequency of "0" alleles along that region
+ 
+```{r freq_ref_alleles}
+d %>% mutate(reff = refc / (refc + altc)) %>% 
+    ggplot(aes(x = pos, y = reff)) +
+    geom_point()
+```
+ 
+ We see there is a region in which we don't have data. This can mean the presence of repeated sequences in which we cannot find SNPs. In later analysis of LD vs distance between SNPs, this region can lead to outliers. 
+ 
+ - Calculate the statistical association between allelic states of each pair of neighboring SNPS (this association is also called LD)
+ 
+```{r LD}
+linecols <- 10:205  #colnames(d[,10:ncol(d)])
+LD.m <- matrix(0, nrow = 3, ncol = 3, dimnames = list(c("0", "2", "NA"), c("0", "2", "NA")))
+LD <- c()
+
+for (i in 1:nrow(d)) {
+    
+    for (j in linecols) {
+        LD.m[as.character(d[i,j]), as.character(d[i+1,j])] <- LD.m[as.character(d[i,j]), as.character(d[i+1,j])] + 1
+    }
+    
+    N <- sum(LD.m[1:2,1:2])
+    LD.m <- LD.m / N
+    LD[i] <- LD.m[1,1] - (LD.m[1,1] + LD.m[1,2]) * (LD.m[1,2] + LD.m[1,1])
+    
+    N <- 0
+    LD.m <- matrix(0, nrow = 3, ncol = 3, dimnames = list(c("0", "2", "NA"), c("0", "2", "NA")))
+}
+```
+ 
+ - Explore visually how LD varies with the physical distance between SNPs (measured in bp)
+ We will plot LD² so we avoid negative values.
+ 
+```{r LD_vs_distance}
+#prueba <- d[1:500, ]
+#Calculate the distances between SNPs (create another column with distances to the next SNP)
+d <- d %>% mutate(follpos = c(d$pos[2:nrow(d)], NA), #the last SNP doesn't have a following so we put NA
+                  dist.to.next = abs(pos - follpos),
+                  LD = LD)     #the last SNP doesn't have a following so dist = NA
+
+d %>% ggplot(aes(x = dist.to.next, y = LD**2)) +
+    geom_point(na.rm = T)
+```
+ 
+ From this plot we can not see much due to the outliers but we see that SNPs that are far from each other have a low linkage between them. If we focus in the SNPs with distances up to 1000, as they did in the paper:
+ 
+```{r LD_vs_distance_2}
+d %>% ggplot(aes(x = dist.to.next, y = LD**2)) +
+    geom_point(na.rm = T) +
+    xlim(c(0, 500))
+```
+ 
+ Here we can read into the data better and we see that closer SNPs have a higher linkage, as it is shown in the figure 1 of the paper.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

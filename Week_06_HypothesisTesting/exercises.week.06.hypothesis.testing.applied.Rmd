@@ -1,0 +1,226 @@
+---
+title: "Week 06: Hypothesis testing"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+## Hypothesis testing
+
+Our null hypothesis is: minor allele frequencies are the same everywhere on chromosome 6
+Our alternative hypothesis: some places have higher minor allele frequencies than expected (balancing selection)
+
+####Load data and calculate maf
+
+```{r, results='hide'}
+d = read_delim(file="1000g.allele.frequencies.tsv.gz",delim=c("\t"))
+
+d = d %>%
+  filter(population=="EUR") %>%
+  mutate(maf=ifelse(frequency>0.5, 1-frequency, frequency)) %>%
+  filter(maf > 0) %>%
+  mutate(population=factor(population), 
+         reference_allele=factor(reference_allele), 
+         alternative_allele=factor(alternative_allele))
+
+summary(d)
+```
+
+####For all snps calculate a "bin25k" variable based on position, each bin should be 25 kb
+
+```{r}
+d = d %>%                                                     
+    mutate(bin25k = position %/% 25000) %>%
+    ungroup()
+```
+
+Checkpoint
+
+`names(d)`
+
+[1] "position"           "reference_allele"   "alternative_allele" "population"         "frequency"          "maf"                "bin25k"            
+
+`d %>% head(3)`
+
+1    63979                C                  T        EUR    0.1044 0.1044 2
+
+2    63980                A                  G        EUR    0.1044 0.1044 2
+
+3    73938                A                  G        EUR    0.0010 0.0010 2
+
+For each bin calculate number of snps with maf > 0.2 (n20) , number of snps (n) , a test statistic (ts) = n20/n
+
+Also calculate the position of the bin midpoint (x)
+
+Call the binned results (1 row pr bin) for "br" (binned results)
+
+```{r}
+br = d %>%                                                  
+  group_by(bin25k) %>%                               
+  summarize(n20 = sum(maf>0.2),
+            n   = n(),
+            ts  = n20/n,
+            x = (min(position)+max(position))/2) %>% 
+  ungroup() 
+```
+
+Checkpoint
+
+`names(br)`
+
+[1] "bin25k" "n20"    "n"      "ts"     "x"     
+
+`br %>% head(5)`
+
+1      2     0     3 0.0000000  68958.5
+
+2      3     0     2 0.0000000  88089.0
+
+3      4     0     7 0.0000000 111903.5
+
+4      5     1     7 0.1428571 146700.5
+
+5      6     2    25 0.0800000 162538.5
+
+####Q: Plot this teststatistic along the chromosome and also visualise the number of snps in each bin
+
+```{r}
+pd = br %>% arrange(n)
+
+plot1 = ggplot(data = pd, aes(x=x, y=ts, color=n, size=n)) + 
+  geom_point()  #+
+  #scale_color_gradientn(colours = parula_colors)+
+  #nature_theme()
+
+ggsave(filename = "chromosome.plot.png", plot = plot1, width=100, height=60, units = "mm", dpi=300)
+
+plot1
+```
+
+
+####Q: What is the observed p20 = n20/n for the entire chromosome
+
+```{r}
+prob20 <- d %>% summarise(n=n(), n20 = sum(maf > 0.2), p20 = n20/n)
+prob20<- prob20[[1, 3]]
+prob20
+```
+
+A: 0.1583499
+
+## Continuing from last week
+
+####Q: select the best/easiest way of tesing if the observed proportion of SNPs with maf > 0.2 in the bin (0.1583499) is higher than expected
+
+Our null hypothesis is: minor allele frequencies are the same everywhere on chromosome 6
+
+Our alternative hypothesis: some places have higher minor allele frequencies than expected (balancing selection)
+
+```{r}
+binom <- br %>%
+    ungroup() %>%
+    rowwise() %>%
+    mutate(p = sum(dbinom(n20:n, n, prob = prob20)),
+           p2 = pbinom(n20-1, size = n, prob = prob20, lower.tail = F))
+```
+
+
+####Q: List the 10 most significant bins
+
+```{r}
+binom %>% 
+    arrange(p) %>%
+    head(10)
+```
+
+####What is the lowest pvalue?
+
+```{r}
+binom %>% 
+    select(p) %>%
+    min()
+```
+
+####How many of your bins have p < 0.001?
+
+```{r}
+binom %>% 
+    filter(p < 0.001) %>%
+    nrow()
+```
+
+####If all bins followed H0: how many would you expect to have p < 0.001
+
+```{r}
+nrow(br) * 0.001
+```
+
+####Q: Plot the p value as function of bin position
+
+```{r}
+ggplot(binom, aes(bin25k, p)) +
+    geom_point()
+```
+
+####Q: It is really difficult to see the small pvalues - try to mutate a new pvalue2 = -log10(pvalue) and plot it
+This is called a Manhattan plot - strong signals will be skycrapers of significance
+
+```{r}
+ggplot(binom.test, aes(bin25k, -log(p))) +
+    geom_point()
+```
+
+####Q: Do you see a skyscraper?
+
+YES
+
+##Dividing the chromosome into bins with same number of snps
+
+#### Q: Do the same analysis as before but using bins of size 500 snps instead
+Basically we just want the Manhattan plot
+
+HINT: 
+
+`d %>% 
+  arrange(position) %>% 
+  mutate(SNPnumber = row_number())`
+
+```{r}
+d = d %>% 
+  arrange(position) %>% 
+  mutate(SNPnumber = row_number(), bin500snps = (SNPnumber-1) %/% 500)
+
+binned_results_500 <- d %>%
+    group_by(bin500snps) %>%
+    summarize(n20 = sum(maf>0.2),
+            n   = n(),
+            ts  = n20/n,
+            x = (min(position)+max(position))/2) %>% 
+    ungroup()
+
+
+prob20 <- binned_results_500 %>% summarise(n=n(), n20 = sum(maf > 0.2), p20 = n20/n)
+prob20<- prob20[[1, 3]]
+prob20
+```
+
+
+## Testing a specific hypothesis
+
+Assume that I speculate that the overall frequency of SNPs with maf > 0.05 is really 50% in humans.
+NOTE: maf > 0.05 - I call these "high maf snps"
+Can you test if some bins of size 100 kb have significantly more high maf SNPs?
+Visualize the test results so it is easy to see where significant bins
+HINT: Make manhattan plots but also try and remove all bins with less than 50% of the snps having maf > 0.05 
+
+```{r}
+
+```
+
+## Bonus question
+
+####Can you repeat the final test for all three populations?
+####Do you see a difference between the populations?
+

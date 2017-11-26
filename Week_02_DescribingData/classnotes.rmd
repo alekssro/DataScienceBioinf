@@ -1,0 +1,62 @@
+---
+title: "Lecture Week02 Data Science"
+output: html_notebook
+---
+
+##5/9/17
+
+----
+
+##Sample size
+Checking how the sample size influences the mean and the sd
+
+```{r}
+d1 <- rnorm(10, 300, 500)
+cat("mean:", mean(d1), "standard deviation:", sd(d1))
+
+d2 <- rnorm(100000, 300, 500)
+cat("mean:", mean(d2), "standard deviation:", sd(d2))
+```
+
+Then, sample size only affect the precission of the standard deviation/mean.
+
+------
+
+Find 3 positive values that will give you the result above (mean = 300, sd = 500)
+
+```{r}
+p <- rnorm(3, 300, 500)
+cat("mean:", mean(p), "standard deviation:", sd(p))
+```
+
+---
+
+Exercise
+
+```{r}
+x = c(70:90, 1000, 1100, 1200)
+mean(x)
+median(x)
+sd(x)
+quantile(x)
+mad(x)
+```
+
+
+##Coefficients of variation: 
+We use this to compare different ratio scales (for example, when we measure the sd of the weight of a mouse and the same with an elephant, we won't be able to compare them unless we take the mean into account')
+
+```{r}
+celsius <- c(0, 10, 20, 30, 40)
+farenheit <- c(32, 50, 68, 86, 104)
+sd(celsius)/mean(celsius)*100
+sd(farenheit)/mean(farenheit)*100
+
+kelvin = celsius + 273
+rankine = farenheit + 459.67
+sd(kelvin)/mean(kelvin)*100
+sd(rankine)/mean(rankine)*100
+```
+
+
+

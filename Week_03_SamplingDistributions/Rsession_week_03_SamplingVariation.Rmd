@@ -1,0 +1,241 @@
+---
+title: "Week 03: Sampling Variation"
+output: html_notebook
+---
+
+## How to  import in R datasets used in the textbook
+
+```{r, eval = F}
+install.packages("abd") #First install the abd library that is a companion to the abd textbook.
+library(abd)
+library(tidyverse) # you can also load directly tidyverse
+
+data("HumanGeneLengths") # loading in R the human gene length dataset
+```
+
+## Sampling from ideal and empirical idealized distributions
+
+Ideal, probability distribution
+
+```{r}
+myRandomNumbers = rnorm(n = 10^4, mean=0, sd=1) # In one go you generate 10^4 draws from a standard normal distribution
+```
+ 
+NB: R is very good at generating draws from a while suite of probabilty distributions (more on that in week 4)
+
+### Q1: Using ggplot, make a histogram of these 10^4 draws, check different binning options
+
+```{r}
+qplot(myRandomNumbers, geom="histogram", binwidth = 0.3) 
+```
+
+
+## An empirical distribution used in the book
+
+```{r}
+summary(HumanGeneLengths) 
+```
+
+### Q: What is the unit of gene length?
+Base pairs
+
+### Q2: Using ggplot, make a histogram that mimicks the figure of the book for human gene length 
+
+```{r}
+plot1 <- filter(HumanGeneLengths, gene.length < 15000) %>%
+    ggplot() +
+    geom_histogram(mapping = aes(x = gene.length, ..density..), binwidth = 500, color = "black", fill = "brown")
+
+plot1
+```
+
+
+### Q3: Add some meaningful labels on the X and Y axis. X should be "Human Gene length (pb), Y should be "observed counts"
+
+TO do so use the scale_x_continuous and scale_y_continuous option in ggplot
+
+```{r}
+plot1 + scale_x_continuous("Human Gene length (pb)") + scale_y_continuous("Observed counts")
+```
+
+
+## Sampling from an empirical (finite) distribution
+
+```{r}
+MySmallSample= sample(x = HumanGeneLengths$gene.length, size = 30, replace = T) ## 30 genes sampled WITH replacement
+```
+
+### Q What is the diffference between sampling with and without replacement?
+
+With replacement you can get the same individual twice.
+
+### Q What is the line of code below doing ?
+
+```{r}
+MyBigSample= sample(x = HumanGeneLengths$gene.length, size = length(HumanGeneLengths$gene.length), replace = F)
+summary(MyBigSample)
+```
+
+It is taking all the Human Gene Lengths and printing a summary of the data. This is called the random permutation.
+
+## Drawing a series of samples to build the sampling distribution of a statistic
+
+### My first loop in R
+
+```{r}
+my100Means=rep(-9,100)
+for (i in 1:100){
+  myNewSample=sample(HumanGeneLengths$gene.length, size = 30, replace = T)
+  myNewMean=mean(myNewSample)
+  my100Means[i]=myNewMean
+}
+summary(my100Means)
+```
+
+### Q: my100Means is a small empirical distribution. What does it represent ? (hint examine figure 4.1-3 in the ABD book)
+It represents the sampling distribution of the mean gene length
+
+### Q Compare the mean of my100Means and the mean of HumanGeneLengths. 
+
+```{r}
+mean(my100Means)
+mean(HumanGeneLengths$gene.length)
+mean(my100Means) - mean(HumanGeneLengths$gene.length)
+```
+
+### Q Now modify the small snippet of R code above to draw 5000 samples and compare again
+
+```{r}
+my5000Means=rep(-9,5000) ##???
+for (i in 1:5000){
+  myNewSample=sample(HumanGeneLengths$gene.length, size = 30, replace = T)
+  myNewMean=mean(myNewSample)
+  my5000Means[i]=myNewMean
+}
+summary(my5000Means)
+
+mean(my5000Means)
+mean(HumanGeneLengths$gene.length)
+mean(my5000Means) - mean(HumanGeneLengths$gene.length)
+```
+
+### Q Compare the Y axis of figure 4.1-2 and 4.1-3: what is the difference. Search how to get ggplot to draw histograms of both types.
+Hint try the option  geom_histogram(aes(y = ..density..))
+
+```{r}
+ggplot(HumanGeneLengths, aes(gene.length)) +
+    geom_histogram(breaks = seq(0,15000,500), col = "black", fill = "brown", aes(y = ..density.. * 100)) +
+    coord_cartesian(xlim = c(0, 15000, by = 5000)) +
+    labs(x = "Gene length (bp)", y = "Density")
+```
+
+## Comparing sampling distributions of mean and median gene length
+
+#Q: Adapt the code given above to re create the Figure 4.1-4 of the ABD book .
+
+```{r}
+x <- replicate(5000, {
+    mean(sample(HumanGeneLengths$gene.length, size = 20, replace = T))
+  })
+y <- replicate(5000, {
+    mean(sample(HumanGeneLengths$gene.length, size = 100, replace = T))
+})
+z <- replicate(5000, {
+    mean(sample(HumanGeneLengths$gene.length, size = 500, replace = T))
+})
+
+df <- data.frame("samples" = c(x, y, z)) %>%
+    mutate(n = c(rep(20, 5000), rep(100, 5000), rep(500, 5000)))
+
+ggplot(df, aes(samples, y = ..density.. * 100)) +
+    geom_histogram(col = "black", fill = "brown", binwidth = 50) +
+    facet_wrap(~n, ncol = 1, scales = "free") +
+    coord_cartesian(xlim = c(1200, 5200)) +
+    labs(x = "Sample mean length", y = "Probability")
+
+
+```
+
+
+#Q: Adapt the code to now investigate the sampling distribution of the median gene expression
+
+```{r}
+x <- replicate(5000, {
+    median(sample(HumanGeneLengths$gene.length, size = 20, replace = T))
+  })
+y <- replicate(5000, {
+    median(sample(HumanGeneLengths$gene.length, size = 100, replace = T))
+})
+z <- replicate(5000, {
+    median(sample(HumanGeneLengths$gene.length, size = 500, replace = T))
+})
+
+df <- data.frame("samples" = c(x, y, z)) %>%
+    mutate(n = c(rep(20, 5000), rep(100, 5000), rep(500, 5000)))
+
+ggplot(df, aes(samples, y = ..density.. * 100)) +
+    geom_histogram(col = "black", fill = "brown", binwidth = 50) +
+    facet_wrap(~n, ncol = 1, scales = "free") +
+    coord_cartesian(xlim = c(1200, 5200)) +
+    labs(x = "Sample median length", y = "Probability")
+```
+
+
+### What are confidence intervals in statistics ?
+
+A confidence interval is a range of values surrounding the sample estimate that is likely to contain the population parameter
+
+### Q: Draw 100 samples of size 30 genes and for each sample calculate a rough confidence interval for the mean by using the empirical + - 2 SEs 
+
+```{r}
+x <- sample(HumanGeneLengths$gene.length, size = 30)
+
+se <- sd(x) / (length(x) ** 0.5)
+CI <- c(mean(x) - 2 * se, mean(x) + 2 * se)
+CI
+```
+
+### record whether or not the confidence interval calculated contains the true mean of the distribution
+
+```{r}
+trueMean <- mean(HumanGeneLengths$gene.length)
+record <- replicate(100, {
+    x <- sample(HumanGeneLengths$gene.length, size = 30)
+    se <- sd(x) / (length(x) ** 0.5)
+    between(trueMean, mean(x) - 2 * se, mean(x) + 2 * se)
+})
+
+record %>% table()
+```
+
+
+## Distribution of levels of gene expression in Orangutans (upcoming ...)
+
+The overall goal for this exercise is: 
+1. To "reproduce" the vizualization of the data presented in the scientific paper:
+Nguyen L-P, Galtier N, Nabholz B. 2015 Gene expression, chromosome heterogeneity and the fast-X effect
+in mammals. Biol. Lett.11 : 20150010.
+Data source:
+http://dx.doi.org/10.1098/rsbl.2015.0010
+The data underlying this study are available on Dryad:
+doi:10.5061/dryad.qr20n
+2. get familiarized with data summaries for "noisy" variables
+
+
+
+##Preamble for loading the data
+setwd(dir = "/Users/tbata/Dropbox/2017.FALL.Datascience.in.Bioinformatics/Dropbox.Data.Science.in.Bioinformatics/Week_03_SamplingDistributions/") #ADapt to your path here
+mammals=read.csv(file = "rsbl20150010supp1.csv", header=T)
+head(mammals) # a glimpse of the data
+
+#### Q0: Understand the data ####
+#identify how each column of the data corresponds to the variables described in the methods section of the paper 
+
+
+#Question 1: extract a subdataset containing the chimpanzee data & vizualize the distribution of gene expression
+#Question 2: do a scatter plot gene expression against dNdS: are X linked genes  "atypical"?
+#Question 3: Suggest ways to better vizualize this relationship
+# Question 4: Reproduce Figure 1 ####
+# There are many ways of doing this ... I dont want an exact match of the look .. but I want to see a graph depicting the same info
+
+
