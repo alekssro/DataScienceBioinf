@@ -1,4 +1,4 @@
-## Class notes 28/11/2017
+# Class notes 28/11/2017
 ### Likelihood example
 
 For the example about father and mother mutation rate passed to the offspring: Poisson regression model.
