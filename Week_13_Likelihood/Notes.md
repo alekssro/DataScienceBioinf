@@ -9,5 +9,6 @@ glm(data, response_variable ~ covariable, family = "poisson")
 
 anova(glm, test = "LRT") # Likelihood ratio test (Am I fitting the data better?) 
 
-Yes, adding the slope gives a (massive) increase of the fit. Very likely.
+- Adding father's age: Yes, adding the slope gives a (massive) increase of the fit. Very likely.  
+- Adding mother's age: No, adding the mother's age doesn't increase the fit.  
 
