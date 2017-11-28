@@ -13,4 +13,3 @@ Also, we can assume that the response variable is normally distributed so we cou
 - Adding mother's age: No, adding the mother's age doesn't increase the fit.  
 
 We have to take into account that the matting of mother-father seems to be related (people mate by age).  
-
