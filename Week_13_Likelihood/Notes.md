@@ -5,10 +5,12 @@ For the example about father and mother mutation rate passed to the offspring: P
 
 Also, we can assume that the response variable is normally distributed so we could use Generalized Linear Models with Likelihood as the way of fitting the model.  
 
-glm(data, response_variable ~ covariable, family = "poisson")
+`glm(data, response_variable ~ covariable, family = "poisson")`
 
-anova(glm, test = "LRT") # Likelihood ratio test (Am I fitting the data better?) 
+`anova(glm, test = "LRT") # Likelihood ratio test (Am I fitting the data better?)` 
 
 - Adding father's age: Yes, adding the slope gives a (massive) increase of the fit. Very likely.  
 - Adding mother's age: No, adding the mother's age doesn't increase the fit.  
+
+We have to take into account that the matting of mother-father seems to be related (people mate by age).  
 
