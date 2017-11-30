@@ -57,7 +57,7 @@ xs[which.max(ys)] ##you get the value at the index position of the max in the ys
 
 #### Note that in that very simple case the MLE is known analytically: 
 ### MLE is just p=yobs/nT for the binomial case... Does it make sense ?
-
+Yobs/nT
 
 ##Likelihood based confidence interval for the population parameter(reproducing fig 20-3-2):
 
@@ -75,7 +75,7 @@ abline(h = maxL-1.92)
 
 # The loglikelihood ratio test statistic and its associated p-value:
 
-G=2*(LoglikelihoodWasp(0.72)- LoglikelihoodWasp(0.5))
+G=2*(LoglikelihoodWasp(0.72) - LoglikelihoodWasp(0.5))
 # Under the hypothesis Ho: p=0.5, we expect G to be Chi^2 with 1 df. 
 # So any G value above 3.84 (the 0.95 cutoff of a Chi^2 with 1.d.f) is rejecting Ho at the 0.05 level
 qchisq(0.95,df=1) #(qchisq gives you the minimum chi square value where 95 of the values falls.)
@@ -119,8 +119,6 @@ qchisq(0.95,df=1) #(qchisq gives you the minimum chi square value where 95 of th
 # in the hrpg(STOP) background 6 experimental lines (Tgens of evolution in each line) 
 #   yielding in total  39+47+84+48+46+86 =350  SNPs mutations
 # in the hrcv(STOP) background 3 exp lines (Tgens in each line) yielding in total 33+38+25 = 96 SNPs mutations
-
-
 # The number of point mutations (SNPs) detected in the experimental lines suggests that 
 # lines evolving in the hrpg(STOP) background undergo a higher mutation rate relative to 
 # the lines evolving from a hrcv(STOP) ancestor.
