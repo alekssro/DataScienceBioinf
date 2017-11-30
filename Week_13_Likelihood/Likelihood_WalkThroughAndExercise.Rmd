@@ -144,6 +144,7 @@ To do so Generate 10,000 datasets under the null hypothesis: ie in that case nT=
 
 ```{r}
 nT = 32
+Gs <- rep(0, 10000)
 Gs <- replicate(10000, {
     Yobs = rbinom(n = 1, size = 32, prob = 0.5)
     2 * (LoglikelihoodWasp(Yobs / nT) - LoglikelihoodWasp(0.5))
@@ -163,7 +164,17 @@ Graph and compare the likelihood profiles for the three datasets on the same gra
 
 Recalculate the likelihood ratio test and its associated p-value for each dataset
 
+```{r}
+nTtest = c(32, 64, 160)
+Yobstests = c(23, 46, 115)
+colours = c("black", "orange", "red")
+pvalratio = rep(0, 3)
+
+```
+
+
 -----------------------
+
 # Example B: Whole Genome resequencing of genomes stemming from an experimental evolution design 
 
 ### Background
@@ -171,7 +182,9 @@ A number of lines of bacteria have been transferred regularly in the lab (so cal
 Lines were founded from the same ancectral genotype but with some specific genes "knocked out"
 
 Data consists in observed counts of SNPs detected relative to the Nod+ ancestor at the end of the experiment
+
 We have as data:
+
 in the hrpg(STOP) background 6 experimental lines (Tgens of evolution in each line)
   yielding in total  39+47+84+48+46+86 =350  SNPs mutations
 in the hrcv(STOP) background 3 exp lines (Tgens in each line) yielding in total 33+38+25 = 96 SNPs mutations
@@ -181,7 +194,7 @@ the lines evolving from a hrcv(STOP) ancestor.
 The purpose of the questions below is to explore whether
 there is statistical evidence for that assertion using a likelihood framework.
 Model Assumptions for calculating the likelihood of the data:
-The mutation process  is assumed to be a Poisson (stochastic) process with rate lambda= Tgens*mu,
+The mutation process  is assumed to be a Poisson (stochastic) process with rate $\lambda= Tgens*\mu$,
 where Tgens is the actual number of generation separating the ancestral strains from the resequenced strains
 at the end of the experiment and mu the mutation rate (define per genome and per generation)
 
@@ -205,9 +218,39 @@ but here we assume that the number of nucleotide over which SNP mutations could 
 
 Hint: use the density of a poisson distribution dpois()
 
+```{r}
+Tgens = 600
+
+#Yobs = nº of mutations, U = parameter of interest, Tgens = nº of generations
+LoglikelihoodPoisson = function(U, Yobs, Tgens){    
+    U = U * Tgens
+    return(dpois(x = Yobs, lambda = U, log = T))
+}
+```
 
 
 #### Question 2: For each genomic background find the MLE of U and an approx 95% confidence interval for U.
+
+```{r}
+ys_hrpg = c(39,47,84,48,46,86)
+xs = seq(from = 0.02, to = 0.15, by = 0.005)
+
+logLData_hrpg = 0
+for (i in ys_hrpg) {
+    logLData_hrpg = logLData_hrpg + LoglikelihoodPoisson(xs, i, 600)
+}
+logLData_hrpg
+
+ys_hrcv = c(33,38,25)
+logLData_hrcv = 0
+for (i in ys_hrcv) {
+    logLData_hrcv = logLData_hrpg + LoglikelihoodPoisson(xs, i, 600)
+}
+logLData_hrcv
+
+# plot()
+```
+
 
 #### Question3: Use a likelihood ratio test to compare a null model where both genomic background have identical mutation rate U versus an alternative model where U1 and U2 are background specific mutation rates for respectively the hrpg(STOP) and hrcv(STOP) background.
 

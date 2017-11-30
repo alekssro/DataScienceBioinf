@@ -1,0 +1,76 @@
+---
+title: "Notes for likelihood example Icelandic trios"
+author: "Thomas Bataillon"
+date: "11/28/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) ## basic option can be tweaked
+```
+
+## The actual data 
+
+This is a small dataset where 5 trios where sequenced to high coverage to detect new mutations. Data source is https://www.nature.com/articles/nature11396.
+
+
+```{r data}
+dataTrio = data.frame(trio = c('Trio1','Trio2','Trio3','Trio4','Trio5'), 
+                  fathers.age = c(22,23,25,36,40),
+                  mother.age = c(19,29,22,32,39),
+                  paternal.chrom = c(39,43,51,53,91),
+                  maternal.chrom = c(9,10,11,26,15),
+                  combined = c(48,53,62,79,106))
+```
+
+## A quick look at the data
+
+So clearly there is something going with age ... 
+
+```{r plotTrios, echo=FALSE}
+plot(dataTrio$fathers.age,dataTrio$paternal.chrom, col="green", cex=3, 
+     pch=20,xlim=c(15,45), ylim=c(0,100), xlab = "Age of Mother or Father (years)",
+     ylab="Number of paternal or maternal mutations")
+points(dataTrio$mother.age,dataTrio$maternal.chrom, col="magenta", pch=20, cex=3)
+
+```
+
+## Using the glm function to implement a Poisson regression
+The glm() function is a very versatile extention of the classic linear model function lm()
+```{r}
+AgeF=glm(data = dataTrio, paternal.chrom~fathers.age, family = "poisson")
+summary(AgeF)
+anova(AgeF, test="LRT")
+```
+Note that the summary and the ANOVA table are similar but with important differences to lm(). In particular now you have a numerical optimization behind the scene for maximizing the likelihood 
+Note the syntax that is very much like the formula used in linear models. Here you specify what family of distribution is used for modelling.
+
+```{r}
+AgeM=glm(data = dataTrio, maternal.chrom~mother.age, family = "poisson")
+summary(AgeM)
+anova(AgeM, test="LRT")
+
+```
+With mother there is a weak effect of age (an order of magnitude weaker)
+
+## A combined mutations model and fitted values 
+```{r}
+naiveM=glm(data = dataTrio, combined~fathers.age+mother.age, family = "poisson")
+summary(naiveM)
+anova(naiveM, test="LRT") ## Note seqential tests by LRT 
+names(naiveM) ## useful to inspect these
+
+```
+
+## a look at the overall fit achieved 
+We refit a model using only the father.age as regressing variable and examine the visual fit of the model.... and it is pretty impressive (but we have 5 data points!)
+
+```{r}
+globalF=glm(data = dataTrio, combined~fathers.age, family = "poisson")
+
+plot(dataTrio$fathers.age,dataTrio$combined, col="blue", cex=3, 
+     pch=20,xlim=c(15,45), ylim=c(30,120), xlab = "Age of father (years)",
+     ylab="Combined number of mutations")
+points(dataTrio$fathers.age, globalF$fitted.values, col="red", pch=20, cex=2)
+```
+
