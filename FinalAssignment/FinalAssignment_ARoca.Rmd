@@ -7,6 +7,108 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
+
+# Whole-genome patterns of nucleotide diversity & recombination in the model legume Medicago truncatula
+
+<!-- Notes for project:  -->
+
+<!-- filter (maybe filter windows with small size) -->
+
+<!-- finding CI for median: bootstrap approach (slice data by chromosome and resample them, calculate the median and get the distribution) - example in book (chimpanzee example) -->
+
+<!-- 4- how much gen diversity vary among windows: qp.site ~ recomb (nt div per site, are the SNP far away or not?) whar are the variables to explain window diversity (qp.site) -> chr, recomb, genedensity   -->
+<!-- *background selection: deleterious mutations are eliminated from population and that takes other SNPs with it (LD), we would expect less density in the window. Look how are compared models taking into account the gene density and models taking into account also chr, recombination.... Graph visualize faceting (by one variable/two variables at a time... choose). Models: -->
+<!-- - qp.site ~ recomb -->
+<!-- - qp.site ~ recomb + genedensity (are they interacting? (enough to explain the data?)) -->
+<!-- - qp.site ~ chr + recomb + genedensity (!declare chr as factor) -->
+<!-- - qp.site ~ chr*recomb + genedensity -->
+
+## 1. Import and filter the dataset in R.  
+
+Read about the metadata: how is the data organized, what do variables in the data mean roughly.  
+How many chromosomes, how many genomic windows are available in the dataset? Are obvious windows that are “big” outliers?
+Choose a subset of the dataset by excluding windows that have very few SNPs (LdH_SNPs) and/or a window size that is very small (examine
+the distribution of ldH_win_size).
+
+```{r}
+data <- read.delim("Data_Mt_DSBionf.csv", sep = ",")
+data$chr <- as.factor(data$chr)
+plot_data <- data %>% ggplot()
+plot_data + geom_histogram(mapping = aes(x = LdH_SNPs))
+plot_data + geom_histogram(mapping = aes(x = ldH_win_size), bins = 100)
+```
+
+Looking at the distribution we can filter the data to retain the ones within 3*sd from the mean.
+
+```{r}
+#Filtering for number of SNPs
+lowlim <- mean(data$LdH_SNPs) - 3*sd(data$LdH_SNPs)
+highlim <- mean(data$LdH_SNPs) + 3*sd(data$LdH_SNPs)
+d <- data %>%
+    filter(LdH_SNPs > lowlim) %>%
+    filter(LdH_SNPs < highlim)
+
+#Filtering for window size
+lowlim <- mean(data$ldH_win_size) - 3*sd(data$ldH_win_size)
+highlim <- mean(data$ldH_win_size) + 3*sd(data$ldH_win_size)
+d <- data %>%
+    filter(ldH_win_size > lowlim) %>%
+    filter(ldH_win_size < highlim)
+```
+
+Check what percentage of the windows you keep / discard.
+
+```{r}
+cat("We keep ", round(dim(d)[1] / dim(data)[1] * 100, digits = 2), "% of the data\n", sep = "")
+```
+
+Keep that filtered subset fixed for the remaining analysis.
+
+---------------------------------------------------------------------------
+
+2. Displaying genomic data
+
+Make a graph that illustrates patterns of variation in recombination (as measured by rho) and polymorphism (as measured by qp.site) along chromosome 5 (see for instance Fig 4 of the paper).
+
+```{r}
+plot_chr5 <- d %>% filter(chr == "5") %>% ggplot()
+
+plot_chr5 +
+    geom_area(mapping = aes(y = rho_kb / rho_theta / 1000, x = dist_cent), fill = "royalblue4") +
+    geom_area(mapping = aes(y = rho_kb / 1000, x = dist_cent), fill = "red3") +
+    geom_vline(xintercept = 0)
+
+plot_chr5 + 
+    geom_line(mapping = aes(y = rho_theta, x = dist_cent)) +
+    geom_vline(xintercept = 0, color = "red") +
+    geom_hline(yintercept = 1, linetype = "dashed")
+
+plot_chr5 +
+    geom_line(mapping = aes(y = gene_dens, x = dist_cent), color = "forestgreen") +
+    geom_vline(xintercept = 0, color = "red")
+```
+
+
+## 3. Summarizing levels of Recombination and polymorphism in M. truncatula
+Use a boxplot or any other graphically more convenient way to illustrate the distribution of nucleotide diversity (qp.site) and
+
+recombination rate (rho per kb) among the different chromosomes of M.
+truncatula.
+Are means or median better summaries for these variables?
+For each chromosome calculate the (mean) (or median) recombination
+rate and its associated 95% CI. Present these results as a table
+The authors state that “The population-scaled recombination rate is
+approximately one-third of the mutation rate, consistent with expectations for a
+species with a high selfing rate.” Using the ratio calculated by the authors
+(rho_theta) discuss if you support that assertion.
+Is there a lot of variation between chromosomes for this ratio?
+4. A test of an evolutionary hypothesis
+One of the conclusion of the paper made by the is that
+>“Nucleotide diversity in 100-kb windows was negatively correlated with gene
+density, which is expected if diversity is shaped by selection acting against slightly
+deleterious mutations. “ We want to reproduce analysis and discuss if our analysis
+support this conclusion?  
 
 
