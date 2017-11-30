@@ -36,7 +36,7 @@ the distribution of ldH_win_size).
 data <- read.delim("Data_Mt_DSBionf.csv", sep = ",")
 data$chr <- as.factor(data$chr)
 plot_data <- data %>% ggplot()
-plot_data + geom_histogram(mapping = aes(x = LdH_SNPs))
+plot_data + geom_histogram(mapping = aes(x = LdH_SNPs), bins = 50)
 plot_data + geom_histogram(mapping = aes(x = ldH_win_size), bins = 100)
 ```
 
@@ -92,18 +92,60 @@ plot_chr5 +
 
 
 ## 3. Summarizing levels of Recombination and polymorphism in M. truncatula
-Use a boxplot or any other graphically more convenient way to illustrate the distribution of nucleotide diversity (qp.site) and
 
-recombination rate (rho per kb) among the different chromosomes of M.
-truncatula.
+Use a boxplot or any other graphically more convenient way to illustrate the distribution of nucleotide diversity (qp.site) and recombination rate (rho per kb) among the different chromosomes of M. truncatula.
+
+```{r}
+d %>% ggplot(mapping = aes(x = chr, y = qp.site)) +
+    geom_violin() +
+    geom_boxplot(width=0.1) +
+    stat_summary(fun.y=mean, geom="point", size=2, color = "red4")
+
+d %>% ggplot(mapping = aes(x = chr, y = rho_kb)) +
+    geom_violin() +
+    geom_boxplot(width=0.1) +
+    stat_summary(fun.y=mean, geom="point", size=2, color = "red4")
+```
+
 Are means or median better summaries for these variables?
-For each chromosome calculate the (mean) (or median) recombination
-rate and its associated 95% CI. Present these results as a table
-The authors state that “The population-scaled recombination rate is
-approximately one-third of the mutation rate, consistent with expectations for a
-species with a high selfing rate.” Using the ratio calculated by the authors
-(rho_theta) discuss if you support that assertion.
+
+As we can see in the plots, there are higher bound outliers which drag the mean to higher values. Therefore, the median is a better summary for these variables.
+
+For each chromosome calculate the (mean) (or median) recombination rate and its associated 95% CI. Present these results as a table.  
+
+We will calculate the Confidence Interval by bootstrapping. We will resample the data n times and calculate the median for each resampling. Then, with the distribution obtained from the bootstrap of medians we will check the 0.025 quantile and the 0.975 quantile to obtain the lower and upper boundary of the CI respectively.
+
+```{r}
+#Calculate recombination rate median by chromosome
+d_chr <- d %>% group_by(chr) %>% 
+    summarise(median_rho = median(rho_kb),
+              mean_rho = mean(rho_kb)) #calculate recombination rate by chromosome
+
+N = 100
+boot_med <- as.data.frame(matrix(data = 0, nrow = N, ncol = length(levels(d$chr))))
+colnames(boot_med) <- levels(d$chr)
+for (i in levels(d$chr)) {
+    d_chr_i <- d %>% filter(chr == i)
+    for (n in 1:N) {
+        boot_med[n, i] <- median(sample_n(d_chr_i, dim(d_chr_i)[1], replace = T)$rho_kb)
+    }
+}
+
+CI <- t(apply(boot_med, 2, function(x) quantile(x, c(0.025, 0.975))))
+# means <- apply(boot_med, 2, mean)
+
+cbind(d_chr[,c(2)], CI)     #, d_chr[,c(3)], boot_mean = means)
+```
+
+
+The authors state that:
+
+>“The population-scaled recombination rate is approximately one-third of the mutation rate, consistent with expectations for a species with a high selfing rate.” 
+
+Using the ratio calculated by the authors (rho_theta) discuss if you support that assertion.
+
 Is there a lot of variation between chromosomes for this ratio?
+
 4. A test of an evolutionary hypothesis
 One of the conclusion of the paper made by the is that
 >“Nucleotide diversity in 100-kb windows was negatively correlated with gene
