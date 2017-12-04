@@ -155,13 +155,65 @@ cbind(d_chr[,c(2)], CI)     #, d_chr[,c(3)], boot_mean = means)
 
 *Using the ratio calculated by the authors (rho_theta) discuss if you support that assertion.*
 
+We can see in the $\rho/\theta$ distribution graph for the chromosome 5 (figure 4, reproduced above) that this is not met consistenly along the chromosome 5. We could plot a distribution of the rho_theta ratio:
+
+```{r}
+d %>%
+    ggplot() +
+    geom_histogram(aes(x = rho_theta, ..density..), bins = 100)
+
+d %>%
+    ggplot() +
+    facet_wrap(~chr) +
+    geom_histogram(aes(x = rho_theta, ..density..), bins = 50)
+```
+
+The distribution for all chromosomes and individual chromosomes seem to follow a chi squared distribution:  
+
+```{r}
+
+```
+
+
 *Is there a lot of variation between chromosomes for this ratio?*
 
 ## 4. A test of an evolutionary hypothesis
 
-*One of the conclusion of the paper made by the is that:  *
+*One of the conclusion of the paper made by the author is that:*  
+
 >“Nucleotide diversity in 100-kb windows was negatively correlated with gene density, which is expected if diversity is shaped by selection acting against slightly deleterious mutations.“ 
 
 *We want to reproduce analysis and discuss if our analysis support this conclusion?*   
 
+*The so called “background selection hypothesis” states that genomic regions that are experiencing more deleterious mutations may exhibit overall less polymorphism because selection as it “weeds out” delterious mutations also eliminates other SNP variation in their vicinity. This hypothesis makes the prediction that “everything else being equal”:*  
 
+- *Gene-dense regions (because they are more prone to produce deleterious mutation) should be exhibiting comparatively less polymorphism than regions that are gene poor.*
+- *Background selection will have more influence in regions that have a low recombination rate.*  
+
+*So far testing this hypothesis and its predictions was not easy (except for a few model species) because it requires enormous amounts of polymorphism data. We want to test that hypothesis in M truncatula.*  
+
+**4.1** *Formulate expectations for what genomic covariate will explain variation in nucleotide diversity (qp.site) of a window.*  
+
+*Using linear models, explore if there is support for the predictions of the background selection hypothesis in the patterns of M truncatula genetic diversity.*
+
+**4.2** *Are all chromosome of the M truncatula genome exhibiting similar patterns?*
+
+*(Explore this visually and using appropriate linear models that include a chromosome factor and how chromosome can “interact” with the factors of your anlaysis)*  
+
+*Can other covariate potentially confounding the background selection hypothesis predictions?*
+
+## 5. Tracking footprints of recent and intense selection in the Medicago truncatula genome.
+
+**5.1** *According to the so-called “selective sweep” scenario, if a region contains a mutation that was recently selected, this recent and intense selection is likely to wipe out most of the polymorphism in that region.*
+
+*Do you find footprints for a recent major selective sweep as evidenced by 2 or more consecutive windows with very low diversity (qp.site) relative to the rest of the genome?*
+
+*Hint: explore graphically where the least polymorphic windows (use the 5% least polymorphic windows within the genome) are located. 5.2 Is the location of least polymorphic windows randomly distributed on chromosomes?*
+
+*Hint: To make such a test, you can group windows into larger segments comprising 20 windows and count the number of windows containing least polymorphic windows in each segment. “On average” you expect 1 of such 5% least polymorphic windows per segment. Think about what probability distribution you expect can capture the fact that windows with low level of polymorphisms are occurring “at random” along the chromosome in each segment. Then decide on a statistic you can use to test the null hypothesis that the “location of least polymorphic windows is randomly distributed along the chromosomes”. Get a null distribution for such test statistic and state whether you reject the null or not for each chromosome by discussing the p-values you obtain.*
+
+**5.3** *Another typical footprint of a selective sweep is, besides having lower polymorphism, the fact that genomic regions that have experienced a recent selective sweep are expected to have an excess of rare variants (i.e. the only mutations that contribute to polymorphism are recent and therefore still in low frequency). The excess of rare variants in a window can be measured through the summary statistics “Tajima’s D”. Negative Tajima’s D values mean an excess of rare variants (SNPs) while positive Tajima’s D means an excess of frequent SNPs relative to a neutrally evolving region.*
+
+*Are windows exhibiting abnormally low amounts of polymorphism –as measured by qp.site are also having more negative Tajima’s D values?*
+
+*Use some statistical inference method to examine the relationship. Could other confounding variable obscure this relationship?*

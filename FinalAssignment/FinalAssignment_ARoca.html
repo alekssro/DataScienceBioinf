@@ -234,13 +234,13 @@ CI &lt;- t(apply(boot_med, 2, function(x) quantile(x, c(0.025, 0.975))))
 
 cbind(d_chr[,c(2)], CI)     #, d_chr[,c(3)], boot_mean = means)</code></pre>
 <pre><code>##   median_rho      2.5%    97.5%
-## 1     0.7710 0.6637375 0.942050
-## 2     0.8940 0.8140000 1.021625
-## 3     1.3080 1.1160000 1.469675
-## 4     1.0090 0.8024750 1.119125
-## 5     1.9310 1.7810000 2.138000
-## 7     1.2205 1.0853500 1.421813
-## 8     1.0235 0.7732750 1.236100</code></pre>
+## 1     0.7710 0.6660375 0.932275
+## 2     0.8940 0.8166125 1.013150
+## 3     1.3080 1.1454250 1.375000
+## 4     1.0090 0.7828250 1.134075
+## 5     1.9310 1.7508750 2.114000
+## 7     1.2205 1.0703750 1.418037
+## 8     1.0235 0.7769500 1.240862</code></pre>
 <p><em>The authors state that:</em></p>
 <blockquote>
 <p>“The population-scaled recombination rate is approximately one-third of the mutation rate, consistent with expectations for a species with a high selfing rate.”</p>
@@ -250,7 +250,7 @@ cbind(d_chr[,c(2)], CI)     #, d_chr[,c(3)], boot_mean = means)</code></pre>
 </div>
 <div id="a-test-of-an-evolutionary-hypothesis" class="section level2">
 <h2>4. A test of an evolutionary hypothesis</h2>
-<p><em>One of the conclusion of the paper made by the is that: </em> &gt;“Nucleotide diversity in 100-kb windows was negatively correlated with gene density, which is expected if diversity is shaped by selection acting against slightly deleterious mutations.“</p>
+<p><em>One of the conclusion of the paper made by the author is that: </em> &gt;“Nucleotide diversity in 100-kb windows was negatively correlated with gene density, which is expected if diversity is shaped by selection acting against slightly deleterious mutations.“</p>
 <p><em>We want to reproduce analysis and discuss if our analysis support this conclusion?</em></p>
 </div>
 </div>
