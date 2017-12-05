@@ -148,34 +148,76 @@ CI <- t(apply(boot_med, 2, function(x) quantile(x, c(0.025, 0.975))))
 cbind(d_chr[,c(2)], CI)     #, d_chr[,c(3)], boot_mean = means)
 ```
 
-
 *The authors state that:*
 
 >“The population-scaled recombination rate is approximately one-third of the mutation rate, consistent with expectations for a species with a high selfing rate.” 
 
-*Using the ratio calculated by the authors (rho_theta) discuss if you support that assertion.*
+*Using the ratio calculated by the authors (rho_theta) discuss if you support that assertion.*  
 
-We can see in the $\rho/\theta$ distribution graph for the chromosome 5 (figure 4, reproduced above) that this is not met consistenly along the chromosome 5. We could plot a distribution of the rho_theta ratio:
-
-```{r}
-d %>%
-    ggplot() +
-    geom_histogram(aes(x = rho_theta, ..density..), bins = 100)
-
-d %>%
-    ggplot() +
-    facet_wrap(~chr) +
-    geom_histogram(aes(x = rho_theta, ..density..), bins = 50)
-```
-
-The distribution for all chromosomes and individual chromosomes seem to follow a chi squared distribution:  
+Being this statement true, the ratio $\rho/\theta$ should be distributed around the value $1/3$. We can test by performing an appropriated test with H:0: $\mu = 1/3$ and H1: $\mu \neq 1/3$.
 
 ```{r}
+d %>% ggplot() +
+    geom_histogram(aes(x = rho_theta, ..density..), bins = 100) +
+    geom_vline(xintercept = 1/3, color = "red") #H0
 
+t.test(x = d$rho_theta, mu = 1/3, alternative = "two.sided")
+wilcox.test(x = d$rho_theta, mu = 1/3, alternative = "two.sided")
 ```
 
+According to this hypothesis testing, we can reject the nule hypothesis of the mean $\rho/\theta$ ratio being equal to $1/3$.
 
-*Is there a lot of variation between chromosomes for this ratio?*
+Another way of testing the relationship between $\rho$ and $\theta$ is to see if the population-scaled recombination rate ($\rho$) and one-third of the mutation rate ($\theta/3$) seem to follow the same distribution.
+
+```{r}
+theta_kb <- d$rho_kb / d$rho_theta
+expected_rho_kb <- theta_kb / 3
+
+d %>% ggplot() +
+    geom_area(aes(x = expected_rho_kb, y = ..density..), 
+              bins = 100, stat = "bin", fill = "royalblue4") +
+    geom_area(aes(x = rho_kb, y = ..density..), stat = "bin", 
+              bins = 100, fill = "red2", alpha = 0.7) +
+    labs(x = expression(paste(theta, "w (blue) and ", rho, " (red)")))
+
+wilcox.test(x = expected_rho_kb, y = d$rho_kb)
+```
+
+Again, we reject the hypothesis of both variables following the same distribution.
+
+Finally, we could adjust a linear model to the variables which, according to the authors' hypothesis, it should be $\rho = \theta/3 + n$.
+
+```{r}
+ggplot(d, aes(x = theta_kb, y = rho_kb)) +
+    # ylim(c(0, 12.5)) +     #outliers
+    geom_point() +
+    geom_smooth(method = "lm")
+
+lm <- lm(d$rho_kb ~ theta_kb)
+summary(lm)
+```
+
+The adjusted model is the following: $\rho = 0.407\theta - 0.794$ ??????????????????????
+
+*Is there a lot of variation between chromosomes for this ratio?*  
+
+We can answer this question performing an ANOVA test.
+
+```{r}
+lm <- lm(rho_theta ~ chr, data = d)
+anova(lm)
+```
+
+As the Analysis of Variance Table returns, there is a lot of variation between chromosomes for this ratio. We can represent this visualy. 
+
+```{r}
+d %>% ggplot(mapping = aes(x = rho_theta, y = ..density.., color = chr)) +
+    geom_freqpoly(bins = 100) +
+    geom_vline(xintercept = median(d$rho_theta))
+```
+
+We can see a lower density around the overall median of `rho_theta` for the chromosome 5 plus a higher variation around this value.
+
 
 ## 4. A test of an evolutionary hypothesis
 
