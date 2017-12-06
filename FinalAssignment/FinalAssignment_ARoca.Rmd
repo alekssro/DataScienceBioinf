@@ -21,7 +21,7 @@ library(tidyverse)
 <!-- 4- how much gen diversity vary among windows: qp.site ~ recomb (nt div per site, are the SNP far away or not?) whar are the variables to explain window diversity (qp.site) -> chr, recomb, genedensity   -->
 <!-- *background selection: deleterious mutations are eliminated from population and that takes other SNPs with it (LD), we would expect less density in the window. Look how are compared models taking into account the gene density and models taking into account also chr, recombination.... Graph visualize faceting (by one variable/two variables at a time... choose). Models: -->
 <!-- - qp.site ~ recomb -->
-<!-- - qp.site ~ recomb + genedensity (are they interacting? (enough to explain the data?)) -->
+<!-- - qp.site ~ recomb + genedensity (are they interacting? enough to explain the data?) -->
 <!-- - qp.site ~ chr + recomb + genedensity (!declare chr as factor) -->
 <!-- - qp.site ~ chr*recomb + genedensity -->
 
@@ -54,7 +54,7 @@ d <- data %>%
 #Filtering for window size
 lowlim <- mean(data$ldH_win_size) - 3*sd(data$ldH_win_size)
 highlim <- mean(data$ldH_win_size) + 3*sd(data$ldH_win_size)
-d <- data %>%
+d <- d %>%
     filter(ldH_win_size > lowlim) %>%
     filter(ldH_win_size < highlim)
 ```
@@ -216,7 +216,32 @@ d %>% ggplot(mapping = aes(x = rho_theta, y = ..density.., color = chr)) +
     geom_vline(xintercept = median(d$rho_theta))
 ```
 
-We can see a lower density around the overall median of `rho_theta` for the chromosome 5 plus a higher variation around this value.
+We can see a higher variation around the overall median of `rho_theta` for the chromosome 5. If we perform the above test for the chromosome 5:
+
+```{r}
+d5 <- d %>% filter(chr == "5")
+
+d5 %>%
+    ggplot() +
+    geom_histogram(aes(x = rho_theta, ..density..), bins = 100) +
+    geom_vline(xintercept = 1/3, color = "red") #H0
+
+t.test(x = d5$rho_theta, mu = 1/3, alternative = "two.sided")
+wilcox.test(x = d5$rho_theta, mu = 1/3, alternative = "two.sided")
+
+theta_kb <- d5$rho_kb / d5$rho_theta
+expected_rho_kb <- theta_kb / 3
+
+d5 %>% filter(chr == "5") %>%
+    ggplot() +
+    geom_area(aes(x = expected_rho_kb, y = ..density..), 
+              bins = 100, stat = "bin", fill = "royalblue4") +
+    geom_area(aes(x = rho_kb, y = ..density..), stat = "bin", 
+              bins = 100, fill = "red2", alpha = 0.7) +
+    labs(x = expression(paste(theta, "w (blue) and ", rho, " (red)")))
+
+wilcox.test(x = expected_rho_kb, y = d5$rho_kb)
+```
 
 
 ## 4. A test of an evolutionary hypothesis
@@ -227,16 +252,47 @@ We can see a lower density around the overall median of `rho_theta` for the chro
 
 *We want to reproduce analysis and discuss if our analysis support this conclusion?*   
 
+```{r}
+# for (i in levels(d$chr)) {
+#     d_chr_i <- filter(d, chr == i)
+#     print(cor.test(x = d_chr_i$qp.site, y = d_chr_i$gene_dens))
+# }
+cor.test(x = d$gene_dens, y = d$qp.site)
+
+lm <- lm(qp.site ~ gene_dens, data = d)
+summary(lm)
+
+d %>% ggplot(aes(x = gene_dens, y = qp.site)) +
+    geom_point() +
+    geom_smooth(method = "lm")
+
+d %>% ggplot(aes(x = gene_dens, y = qp.site)) +
+    facet_wrap(~chr) +
+    geom_point() +
+    geom_smooth(method = "lm")
+```
+
+From the Pearson's correlation test we can see that there is indeed a significant negative correlation between the nucleotide diversity in 100-kb windows (`qp.site` column in data) and the gene density (`gene_dens`). This is also shown in both genome-wide and per chromosome plots.
+
 *The so called “background selection hypothesis” states that genomic regions that are experiencing more deleterious mutations may exhibit overall less polymorphism because selection as it “weeds out” delterious mutations also eliminates other SNP variation in their vicinity. This hypothesis makes the prediction that “everything else being equal”:*  
 
-- *Gene-dense regions (because they are more prone to produce deleterious mutation) should be exhibiting comparatively less polymorphism than regions that are gene poor.*
+- *Gene-dense regions (because they are more prone to produce deleterious mutation) should be exhibiting comparatively less polymorphism than regions that are gene poor.*  
 - *Background selection will have more influence in regions that have a low recombination rate.*  
 
 *So far testing this hypothesis and its predictions was not easy (except for a few model species) because it requires enormous amounts of polymorphism data. We want to test that hypothesis in M truncatula.*  
 
 **4.1** *Formulate expectations for what genomic covariate will explain variation in nucleotide diversity (qp.site) of a window.*  
 
-*Using linear models, explore if there is support for the predictions of the background selection hypothesis in the patterns of M truncatula genetic diversity.*
+First of all, based on the "background selection hypothesis" and the correlation between nucleotide diversity and gene density, we would expect that the gene density will explain variation in nucleotide diversity. Also, the recombination rate is expected to play an important role in the nucleotide diversity. Moreover, we can see there is a high variation between chromosomes for the `qp.site` variable so we could hypothesize that the nucleotide diversity is also dependant on the chromosome. Finally, we could also think that the nucleotide diversity depends on the position of the chromosome.
+
+Therefore, we will perform several correlation test for this variables to determine the best explanation for the variation in nucleotide diversity.
+
+*Using linear models, explore if there is support for the predictions of the background selection hypothesis in the patterns of M truncatula genetic diversity.*  
+
+```{r}
+
+```
+
 
 **4.2** *Are all chromosome of the M truncatula genome exhibiting similar patterns?*
 
