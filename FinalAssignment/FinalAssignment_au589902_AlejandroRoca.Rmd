@@ -12,26 +12,6 @@ library(tidyverse)
 
 # Whole-genome patterns of nucleotide diversity & recombination in the model legume Medicago truncatula
 
-<!-- Notes for project:  -->
-
-<!-- filter (maybe filter windows with small size) -->
-
-<!-- finding CI for median: bootstrap approach (slice data by chromosome and resample them, calculate the median and get the distribution) - example in book (chimpanzee example) -->
-
-<!-- 4- how much gen diversity vary among windows: qp.site ~ recomb (nt div per site, are the SNP far away or not?) whar are the variables to explain window diversity (qp.site) -> chr, recomb, genedensity   -->
-<!-- *background selection: deleterious mutations are eliminated from population and that takes other SNPs with it (LD), we would expect less density in the window. Look how are compared models taking into account the gene density and models taking into account also chr, recombination.... Graph visualize faceting (by one variable/two variables at a time... choose). Models: -->
-<!-- - qp.site ~ recomb -->
-<!-- - qp.site ~ recomb + genedensity (are they interacting? enough to explain the data?) -->
-<!-- - qp.site ~ recomb + chr + chr*genedensity -->
-<!-- - qp.site ~ chr + recomb + genedensity (!declare chr as factor) -->
-<!-- - qp.site ~ chr*recomb + genedensity -->
-
-<!-- Check how the fit is incremented by comparing the models by anova() or type II sum of squares -->
-
-<!-- 5.2 Do we hit the lower 5% randomly(?)? binomial: you know the events that we have and those events should be K p=0.05 (of being polimorfic) ~ poisson with lambda = K p. We can split our 1808 windows in 180 windows with k = 10 and this can be seen as many draws from a binomial distribution or a poisson distributed along windows. If k p is not too large this two distribution are very similar. -->
-
-<!-- 5.3 do graph and see the level of (negative) correlation (it assumes that there is not other variables influencing). Then we can see if the Tajima's D is actually having an effect when we correct for our null model (qp.site ~ gene_dens + chr). In other words, is the Tajima's D explaining the qp.site or is the Tajima's D related to other variables that influence qp.site? -->
-
 ## 1. Import and filter the dataset in R.  
 
 *Read about the metadata: how is the data organized, what do variables in the data mean roughly.  How many chromosomes, how many genomic windows are available in the dataset? Are obvious windows that are “big” outliers?*
@@ -45,7 +25,8 @@ plot_data <- data %>% ggplot()
 plot_data + geom_histogram(mapping = aes(x = LdH_SNPs, ..density..), bins = 50) + 
     labs(title = "Number of SNPs per window distribution", x = "SNP count", y = "Density")
 plot_data + geom_histogram(mapping = aes(x = ldH_win_size, ..density..), bins = 100) +
-    labs(title = "Window size distribution", x = "Window size (bp)", y = "Density")
+    labs(title = "Window size distribution", x = "Window size (bp)", 
+         y = "Density")
 ```
 
 Looking at the distribution we can filter the data to retain the ones within an interval of 3 times the sd from the mean.
@@ -138,7 +119,7 @@ d_chr <- d %>% group_by(chr) %>%
     summarise(median_rho = median(rho_kb),
               mean_rho = mean(rho_kb)) #Calculate recombination rate mean by chromosome
 
-N = 100
+N = 1000
 boot_mean <- as.data.frame(matrix(data = 0, nrow = N, ncol = length(levels(d$chr))))
 colnames(boot_mean) <- levels(d$chr)
 for (i in levels(d$chr)) {
@@ -173,7 +154,7 @@ d %>% ggplot() +
 As we have a big sample, a good way of checking if this statement is true would be to make a Confidence Interval for the mean by bootstrap. We will then check whether the value 1/3 falls inside the CI.
 
 ```{r}
-N = 100
+N = 1000
 boot_mean <- c()
 for (i in levels(d$chr)) {
     boot_mean[i] <- mean(sample(d$rho_theta, length(d$rho_theta), replace = T))
@@ -184,7 +165,7 @@ quantile(boot_mean, c(0.025, 0.975))
 
 According to this, we can't say that the distribution of the ratio $\rho/\theta$ has a mean equal to $1/3$.
 
-Other tests regarding goodness of fit between the distribution of rho and 1/3 of theta, or one sample t-test for the log(rho_theta) (being H0: $\mu = log(1/3)$) lead to the same conclusion.
+Other tests regarding goodness of fit between the distribution of $\rho$ and $theta/3$, or one sample t-test for the log(rho_theta) (being H0: $\mu = log(1/3)$) lead to the same conclusion.
 
 *Is there a lot of variation between chromosomes for this ratio?*  
 
@@ -212,7 +193,7 @@ for (i in levels(d$chr)) {
 }
 
 CI <- t(apply(boot_mean, 2, function(x) quantile(x, c(0.025, 0.975))))
-cont <- ifelse(CI[, 1] <= 1/3 & CI[, 2] >= 0.3, "*", ".")
+cont <- ifelse(CI[, 1] <= 1/3 & CI[, 2] >= 0.3, "*", ".") # '*': Yes, '.': No
 
 data.frame(CI_left = CI[,1], CI_right = CI[, 2], match_hypothesis = cont)
 ```
@@ -229,9 +210,6 @@ We can see that the statement made by the authors is true for chromosomes 3 and 
 
 ```{r}
 cor.test(x = d$gene_dens, y = d$qp.site)
-
-lm <- lm(qp.site ~ gene_dens, data = d)
-summary(lm)
 
 d %>% ggplot(aes(x = gene_dens, y = qp.site)) +
     geom_point() +
@@ -252,41 +230,153 @@ From the Pearson's correlation test we can see that there is indeed a significan
 
 *So far testing this hypothesis and its predictions was not easy (except for a few model species) because it requires enormous amounts of polymorphism data. We want to test that hypothesis in M truncatula.*  
 
-**4.1** *Formulate expectations for what genomic covariate will explain variation in nucleotide diversity (qp.site) of a window.*  
+**4.1 Formulate expectations for what genomic covariate will explain variation in nucleotide diversity (qp.site) of a window.**
 
-First of all, based on the "background selection hypothesis" and the correlation between nucleotide diversity and gene density, we would expect that the gene density will explain variation in nucleotide diversity. Also, the recombination rate is expected to play an important role in the nucleotide diversity. Moreover, we can see there is a high variation between chromosomes for the `qp.site` variable so we could hypothesize that the nucleotide diversity is also dependant on the chromosome. Finally, we could also think that the nucleotide diversity depends on the position of the chromosome.
+First of all, based on the "background selection hypothesis" and the correlation between nucleotide diversity and gene density, we would expect that the __gene density__ will explain variation in nucleotide diversity. Also, the __recombination rate__ is expected to play an important role in the nucleotide diversity. Moreover, we can see there is a high variation between chromosomes for the `qp.site` variable so we could hypothesize that the nucleotide diversity is also dependant on the __chromosome__. Finally, we could also think that the nucleotide diversity depends on the __position__ of the chromosome.
 
 Therefore, we will perform several correlation test for this variables to determine the best explanation for the variation in nucleotide diversity.
 
 *Using linear models, explore if there is support for the predictions of the background selection hypothesis in the patterns of M truncatula genetic diversity.*  
 
-```{r}
+By the background selection hypothesis, gene density and recombination rate should explain the nucleotide diversity.
 
+```{r}
+lm1 <- lm(data = d, qp.site ~ gene_dens)
+lm2 <- lm(data = d, qp.site ~ gene_dens*rho_kb) # Hypothesis model
+# summary(lm2) # interaction gene_dens:rho_kb seems to be important
+anova(lm1, lm2) # gene_dens:rho_kb interaction improves the explanation of qp.site
 ```
 
+**4.2 Are all chromosome of the M truncatula genome exhibiting similar patterns?**
 
-**4.2** *Are all chromosome of the M truncatula genome exhibiting similar patterns?*
+*(Explore this visually and using appropriate linear models that include a chromosome factor and how chromosome can “interact” with the factors of your analysis)*  
 
-*(Explore this visually and using appropriate linear models that include a chromosome factor and how chromosome can “interact” with the factors of your anlaysis)*  
+```{r}
+d %>% ggplot(aes(x = gene_dens, y = qp.site, color = chr)) +
+    geom_smooth(method = "lm", se = F)
 
-Plot the different models in the same plot??
+d %>% ggplot(aes(x = rho_kb, y = qp.site, color = chr)) +
+    geom_smooth(method = "lm", se = F)
+```
+
+As we can see visually in the plots, the adjusted linear model for `qp.site ~ gene_dens` in each chromosome seem to have the same slope for every chromosome except for chromosome 4. Same exception happens when we represent `qp.site ~ rho_kb`, but this time with chromosomes 3 and 5. This could mean that in those chromosome there is an interaction between the chromosome number and the recombination rate/gene density.
+
+If we add the `chr` variable to our model we get a better explanation for `qp.site`:
+
+```{r}
+lm3 <- lm(data = d, qp.site ~ gene_dens*rho_kb + chr)
+anova(lm2, lm3) #adding the chr variable improve the explanation of qp.site
+# summary(lm3)
+```
 
 *Can other covariate potentially confounding the background selection hypothesis predictions?*
 
+As I mentioned above, we could think that for example the position in the chromosome influences the nucleotide diversity.
+
+```{r}
+lm4 <- lm(data = d, qp.site ~ gene_dens*rho_kb + chr + dist_cent)
+anova(lm3, lm4) #adding the chr variable improve the explanation of qp.site
+# summary(lm3)
+```
+
+We can see, `dist_cent` variable seems to be significant, although this could be because the recombination rate varies with the position in the genome as we saw before.
+
 ## 5. Tracking footprints of recent and intense selection in the Medicago truncatula genome.
 
-**5.1** *According to the so-called “selective sweep” scenario, if a region contains a mutation that was recently selected, this recent and intense selection is likely to wipe out most of the polymorphism in that region.*
+**5.1 According to the so-called “selective sweep” scenario, if a region contains a mutation that was recently selected, this recent and intense selection is likely to wipe out most of the polymorphism in that region.**
 
-*Do you find footprints for a recent major selective sweep as evidenced by 2 or more consecutive windows with very low diversity (qp.site) relative to the rest of the genome?*
+*Do you find footprints for a recent major selective sweep as evidenced by 2 or more consecutive windows with very low diversity (qp.site) relative to the rest of the genome? Hint: explore graphically where the least polymorphic windows (use the 5% least polymorphic windows within the genome) are located.* 
 
-*Hint: explore graphically where the least polymorphic windows (use the 5% least polymorphic windows within the genome) are located.* 
+```{r}
+low.div <- quantile(d$qp.site, 0.05)
+d_low.div <- d %>%
+    filter(qp.site <= low.div)
 
-**5.2** *Is the location of least polymorphic windows randomly distributed on chromosomes?*
+d_low.div %>% ggplot(aes(y = qp.site, x = prop_dist, color = chr)) +
+    geom_point()
+```
+
+Exploring the relative position of the least (5%) polymorphic windows, apparently there is a greater number of them located in the positions far from the centromere than in the other parts of the chromosomes. 
+
+Answering the question:
+
+```{r}
+diff_X <- diff(d_low.div$X) #calculate differerence between window number (1 -> consecutive)
+result <- rle(diff_X) #calculate number of times a value is repeated
+max_cons <- max(result$lengths[result$values == 1]) + 1 # X differences between X + 1 elements (windows)
+
+cat("The maximum number of consecutive windows with very low diversity is:", 
+    max_cons)   
+```
+
+Yes, we can find footprints for a recent major selective sweep. There is one place where we can find 2 or more (7) consecutive windows. Concretely in chromosome 3:
+
+```{r}
+consec <- seq(which(result$lengths == max_cons - 1), by = 1, length.out = max_cons)
+select(d_low.div[consec,], window, chr, qp.site)
+```
+
+**5.2 Is the location of least polymorphic windows randomly distributed on chromosomes?**
 
 *Hint: To make such a test, you can group windows into larger segments comprising 20 windows and count the number of windows containing least polymorphic windows in each segment. “On average” you expect 1 of such 5% least polymorphic windows per segment. Think about what probability distribution you expect can capture the fact that windows with low level of polymorphisms are occurring “at random” along the chromosome in each segment. Then decide on a statistic you can use to test the null hypothesis that the “location of least polymorphic windows is randomly distributed along the chromosomes”. Get a null distribution for such test statistic and state whether you reject the null or not for each chromosome by discussing the p-values you obtain.*
+
+We can address this problem in the following way:  
+Considering the null hypothesis as a binomial distribution $X ~ B(n, p)$ with $p = 0.05$, as we know the number of "trials" (n) for each chromosome. Performing a binomial test will let us decide if the number of least polymorphic windows is different than 1 per group of 20 windows, which is the expected by chance under this conditions.   
+
+```{r}
+d_by_chr <- split(d, d$chr) #Divide data set by chromosomes
+
+least.counter <- function(x){
+    
+    ### Divide in chunks ###
+    chunk <- 20
+    n <- nrow(x)
+    r  <- rep(1:ceiling(n/chunk), each=chunk)[1:n]
+    x <- split(x, r) #Split chromosome windows in groups of 20
+    # x <- x[lapply(x, nrow) == 20] #Filter out (last) window with less elements
+    
+    ### Count number of least polymorphic windows per chunk ###
+    sapply(x, function(y) nrow(filter(y, qp.site <= low.div)))
+}
+
+lcounts_by_chr <- lapply(d_by_chr, least.counter)
+
+bin_tests <- lapply(lcounts_by_chr, function(x) binom.test(sum(x == 1), length(x)*20, p = 0.05))
+data.frame(chr = names(bin_tests), random = sapply(bin_tests, function(x) x$p.value > 0.05))
+```
+
+With a 5% thresehold, the distribution of the least polymorphic sites only appears to be randomly distributed for the chromosome 4.
 
 **5.3** *Another typical footprint of a selective sweep is, besides having lower polymorphism, the fact that genomic regions that have experienced a recent selective sweep are expected to have an excess of rare variants (i.e. the only mutations that contribute to polymorphism are recent and therefore still in low frequency). The excess of rare variants in a window can be measured through the summary statistics “Tajima’s D”. Negative Tajima’s D values mean an excess of rare variants (SNPs) while positive Tajima’s D means an excess of frequent SNPs relative to a neutrally evolving region.*
 
 *Are windows exhibiting abnormally low amounts of polymorphism –as measured by qp.site are also having more negative Tajima’s D values?*
 
+```{r warning=FALSE}
+d %>% ggplot(aes(x = qp.site, y = TajimasD)) +
+    geom_point(color = "grey") +
+    geom_point(data = d_low.div, aes(x = qp.site, y = TajimasD)) +
+    facet_wrap(~chr) +
+    geom_smooth(data = d_low.div, aes(x = qp.site, y = TajimasD), method = "lm", 
+                se = F, fullrange = T) +
+    ylim(c(-3, 1))
+```
+
+Yes, we can see this is met for every chromosome except for the 4. This together with the previous results would make as think that chromosome 4 does not present a selective sweep footprint. 
+
 *Use some statistical inference method to examine the relationship. Could other confounding variable obscure this relationship?*
+
+```{r}
+lm5 <- lm(data = d, qp.site ~ TajimasD)
+# summary(lm5)
+```
+
+We can see there is a significant linear relationship between nucleotide diversity and the amount of rare variants. As we saw in the graphs, the least polymorphic the sites are, the more negative is Tajima's D, indicating an excess of rare SNPs.
+
+Adding this variable to our null model defined above:
+
+```{r}
+lm6 <- lm(data = d, qp.site ~ gene_dens * rho_kb  + chr + TajimasD )
+anova(lm3, lm6)
+```
+
+We can see there is an increased fit when we add Tajima's D to our model. 
